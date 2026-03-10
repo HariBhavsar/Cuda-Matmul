@@ -9,6 +9,7 @@ using namespace std::chrono;
 #define EPSILON 0.001
 #define INDEX(I,J,SZ) ((((I) * (SZ)) + (J)))
 const int tileSize = 32;
+const int nelem = 4;
 
 __global__ void tileOne(float* A, float* B, float* C, int dim) {
     __shared__ float tileA[tileSize * tileSize];
@@ -33,6 +34,33 @@ __global__ void tileOne(float* A, float* B, float* C, int dim) {
         __syncthreads();
     }
     C[INDEX(blockIdx.y * blockDim.y + threadIdx.y, blockIdx.x * blockDim.x + threadIdx.x, dim)] = localSum;
+
+}
+
+__global__ void tileTwo(float* A, float* B, float *C, int dim) {
+    __shared__ float tileA[tileSize * tileSize];
+    __shared__ float tileB[tileSize * (tileSize * nelem)];
+    float localSum[nelem];
+    #pragma unroll
+    for (int i=0; i < nelem; i++) {
+        localSum[i] = 0.0f;
+    }
+    for (int tileId = 0; tileId < (dim/tileSize); tileId++) {
+        tileA[INDEX(threadIdx.y, threadIdx.x, tileSize)] = A[INDEX(blockIdx.y * blockDim.y + threadIdx.y, tileId * tileSize + threadIdx.x, dim)];
+        for (int i=0; i < nelem; i++) {
+            tileB[INDEX(threadIdx.y, threadIdx.x + i * tileSize, (tileSize * nelem))] = B[INDEX(tileId * tileSize + threadIdx.y, blockIdx.x * (blockDim.x * nelem)  + threadIdx.x + i * tileSize, dim)];
+        }
+        __syncthreads();
+        for (int i=0; i < nelem; i++) {
+            for (int k=0; k < tileSize; k++) {
+                localSum[i] += tileA[INDEX(threadIdx.y, k, tileSize)] * tileB[INDEX(k, threadIdx.x + i * tileSize, (tileSize * nelem))];
+            }
+        }
+        __syncthreads();
+    }
+    for (int i=0; i < nelem; i++) {
+        C[INDEX(blockIdx.y * blockDim.y + threadIdx.y, blockIdx.x * (blockDim.x * nelem) + threadIdx.x + i * tileSize, dim)] = localSum[i];
+    }
 
 }
 
@@ -86,6 +114,46 @@ int main(int argc, char **argv) {
         dim3 block(32,32);
         dim3 grid((size + block.x - 1) / block.x, (size + block.y - 1) / block.y);
         tileOne<<<grid , block>>>(AGPU,BGPU,CGPU,size);
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess) {
+            std::cerr << "CUDA Error: " << cudaGetErrorString(err) << std::endl;
+        }
+        cudaDeviceSynchronize();
+        cudaMemcpy(CCpy, CGPU, sizeof(float) * size * size, cudaMemcpyDefault);
+        auto curr = high_resolution_clock::now();
+        if (mode & 1) {
+            for (int i=0; i < size; i++) {
+                for (int j=0; j < size; j++) {
+                    if (std::fabs(CCpy[i * size + j] - C[i * size + j])/C[i * size + j] > EPSILON) {
+                        std::cout << "Incorrect result of matmul at indices: (" << i << ", " << j << ")" << std::endl;
+                        std::cout << "Expected: " << C[i * size + j] << ", Got: " << CCpy[i * size + j] << std::endl;
+                        return 1;
+                    }
+                }
+            }
+        }
+        cudaFree(AGPU);
+        cudaFree(BGPU);
+        cudaFree(CGPU);
+        auto duration = duration_cast<microseconds>(curr - prev);
+        std::cout << "[GPU] Time Taken: " << duration.count() << " microseconds" << std::endl;
+    }
+    if (mode & 4) {
+        // GPU based matrix multiplication
+        assert(size % 1024 == 0);
+        auto prev = high_resolution_clock::now();
+        float *AGPU = nullptr;
+        float *BGPU = nullptr;
+        float *CGPU = nullptr;
+        cudaMalloc(&AGPU, sizeof(float) * size * size);
+        cudaMalloc(&BGPU, sizeof(float) * size * size);
+        cudaMalloc(&CGPU, sizeof(float) * size * size);
+        cudaMemcpy(AGPU, A, sizeof(float) * size * size, cudaMemcpyDefault);
+        cudaMemcpy(BGPU, B, sizeof(float) * size * size, cudaMemcpyDefault);
+        cudaMemset(CGPU, 0, sizeof(float) * size * size);
+        dim3 block(32,32);
+        dim3 grid((size + (block.x * nelem) - 1) / (block.x * nelem), (size + block.y - 1) / block.y);
+        tileTwo<<<grid , block>>>(AGPU,BGPU,CGPU,size);
         cudaError_t err = cudaGetLastError();
         if (err != cudaSuccess) {
             std::cerr << "CUDA Error: " << cudaGetErrorString(err) << std::endl;
