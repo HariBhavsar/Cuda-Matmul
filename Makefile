@@ -1,29 +1,30 @@
-# Variables - easier to update in one place
+# Variables
 NVCC        := nvcc
 ARCH        := sm_89
 CFLAGS      := -O3
 LIBS        := -lcublas
 BIN_DIR     := bins
-TARGET      := $(BIN_DIR)/partA.bin
-SRC         := partA.cu
+
+# Define targets explicitly based on source files
+SRCS        := partA.cu partB.cu
+TARGETS     := $(SRCS:%.cu=$(BIN_DIR)/%.bin)
 
 # Default target
-all: $(TARGET)
+all: $(TARGETS)
 
-# The actual compilation rule
-# $@ is a shorthand for the target (the .bin file)
-# $< is a shorthand for the first dependency (the .cu file)
-$(TARGET): $(SRC) | $(BIN_DIR)
+# Pattern Rule: This handles partA.bin from partA.cu AND partB.bin from partB.cu
+# % is a wildcard that matches the filename stem
+$(BIN_DIR)/%.bin: %.cu | $(BIN_DIR)
 	$(NVCC) -arch=$(ARCH) $(CFLAGS) $< $(LIBS) -o $@
 
-# This creates the directory ONLY if it doesn't exist
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
-# "Phony" targets aren't actual files
-.PHONY: all clean partA
+.PHONY: all clean partA partB
 
-partA: $(TARGET)
+# Shortcuts to build specific files
+partA: $(BIN_DIR)/partA.bin
+partB: $(BIN_DIR)/partB.bin
 
 clean:
 	rm -rf $(BIN_DIR)
