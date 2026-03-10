@@ -1,0 +1,5 @@
+Matrices setup successfully
+[CPU] Time taken: 24437844 microseconds
+[GPU] Time Taken: 2056214 microseconds
+[GPU] Time Taken: 117930 microseconds
+[CUBLAS] Time Taken: 59546 microseconds
