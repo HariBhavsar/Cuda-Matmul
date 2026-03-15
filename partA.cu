@@ -2,7 +2,6 @@
 #include <bits/stdc++.h>
 #include <chrono>
 #include <cuda_runtime.h>
-#include <cuda/cmath>
 #include <cublas_v2.h>
 using namespace std::chrono;
 
