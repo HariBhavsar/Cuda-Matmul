@@ -1,9 +1,13 @@
 # Variables
 NVCC        := nvcc
-ARCH        := sm_89
 CFLAGS      := -O3
 LIBS        := -lcublas
 BIN_DIR     := bins
+
+# Fat Binary: Compiles for both P100 (60) and RTX 40-series (89)
+# compute_XX is the virtual architecture (PTX), sm_XX is the binary (SASS)
+ARCH_FLAGS  := -gencode arch=compute_60,code=sm_60 \
+               -gencode arch=compute_89,code=sm_89
 
 # Define targets explicitly based on source files
 SRCS        := partA.cu partB.cu
@@ -12,10 +16,9 @@ TARGETS     := $(SRCS:%.cu=$(BIN_DIR)/%.bin)
 # Default target
 all: $(TARGETS)
 
-# Pattern Rule: This handles partA.bin from partA.cu AND partB.bin from partB.cu
-# % is a wildcard that matches the filename stem
+# Pattern Rule
 $(BIN_DIR)/%.bin: %.cu | $(BIN_DIR)
-	$(NVCC) -arch=$(ARCH) $(CFLAGS) $< $(LIBS) -o $@
+	$(NVCC) $(ARCH_FLAGS) $(CFLAGS) $< $(LIBS) -o $@
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
