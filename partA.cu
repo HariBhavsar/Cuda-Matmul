@@ -36,6 +36,10 @@ __global__ void coalescedMatrixMul(float* A, float* B, float* C, int dim) {
     }
 }
 
+__global__ void dummy(float *X, float *Y, int N) {
+    float x = Y[threadIdx.y * N + threadIdx.x];
+    x += 1.0f;
+}
 
 int main(int argc, char **argv) {
     if (argc != 3) {
@@ -56,6 +60,9 @@ int main(int argc, char **argv) {
             CCpy[i * size + j] = 0.0f;
         }
     }
+    dim3 g(32, 32);
+    dim3 b(32, 32);
+    dummy<<<g,b>>>(A,A,size);
     std::cout << "Matrices setup successfully" << std::endl;
     // First, CPU based matrix multiplication
     if (mode & 1) {

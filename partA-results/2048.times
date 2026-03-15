@@ -1,5 +1,5 @@
 Matrices setup successfully
-[CPU] Time taken: 24437844 microseconds
-[GPU] Time Taken: 2056214 microseconds
-[GPU] Time Taken: 117930 microseconds
-[CUBLAS] Time Taken: 59546 microseconds
+[CPU] Time taken: 21524290 microseconds
+[GPU] Time Taken: 176278 microseconds
+[GPU] Time Taken: 124925 microseconds
+[CUBLAS] Time Taken: 63508 microseconds
